@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Standard Reserve — network simulator</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #0e0e0d;
+    color: #ececea;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 32px 20px;
+  }
+  .wrap { max-width: 560px; width: 100%; }
+  h1 { font-size: 22px; font-weight: 500; margin: 0 0 8px; letter-spacing: -0.01em; }
+  p.sub { font-size: 14px; color: #9c9c98; margin: 0 0 32px; line-height: 1.6; }
+  .field { margin-bottom: 20px; }
+  label { display: flex; justify-content: space-between; font-size: 13px; color: #b5b5b0; margin-bottom: 8px; }
+  label span.val { color: #ececea; font-weight: 500; }
+  input[type="range"] { width: 100%; accent-color: #d85a30; }
+  .chart-label { font-size: 13px; color: #9c9c98; margin: 24px 0 6px; }
+  .chart-box { position: relative; width: 100%; height: 160px; }
+  footer { font-size: 12px; color: #6e6e6a; line-height: 1.6; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Standard Reserve: network simulator</h1>
+  <p class="sub">A simplified simulation of how per-branch yield and exit fees move as the network grows and as an exit wave hits. Not real protocol data — a model to build intuition.</p>
+
+  <div class="field">
+    <label for="days">Simulation length (days) <span class="val" id="daysVal">30</span></label>
+    <input type="range" min="10" max="60" value="30" step="1" id="days">
+  </div>
+
+  <div class="field">
+    <label for="growth">New branches joining per day <span class="val" id="growthVal">12</span></label>
+    <input type="range" min="1" max="40" value="12" step="1" id="growth">
+  </div>
+
+  <div class="field">
+    <label for="shockDay">Exit wave on day <span class="val" id="shockDayVal">18</span></label>
+    <input type="range" min="0" max="60" value="18" step="1" id="shockDay">
+  </div>
+
+  <p class="chart-label">Yield per branch</p>
+  <div class="chart-box">
+    <canvas id="yieldChart" role="img" aria-label="Line chart of daily yield per branch declining as the network grows"></canvas>
+  </div>
+
+  <p class="chart-label">Exit fee</p>
+  <div class="chart-box">
+    <canvas id="feeChart" role="img" aria-label="Line chart of exit fee spiking during the mass exit wave then recovering"></canvas>
+  </div>
+
+  <footer>
+    Simplified illustrative model, not live protocol data.<br>
+    Unofficial fan tool, not affiliated with the Standard Reserve team.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+var yc, fc;
+function compute() {
+  var days = parseInt(document.getElementById('days').value);
+  var growth = parseInt(document.getElementById('growth').value);
+  var shockDay = parseInt(document.getElementById('shockDay').value);
+  var dailyEmission = 500;
+  var branches = 40;
+  var labels = [], yields = [], fees = [];
+  for (var d = 1; d <= days; d++) {
+    branches += growth;
+    var exitingPct = 0;
+    if (Math.abs(d - shockDay) <= 3 && shockDay > 0) {
+      exitingPct = 60 - Math.abs(d - shockDay) * 15;
+      branches = Math.max(20, branches - Math.round(branches * 0.08));
+    }
+    var y = Math.round((dailyEmission / branches) * 10) / 10;
+    var fee = Math.max(5, Math.round(exitingPct * 0.6));
+    labels.push('d' + d);
+    yields.push(y);
+    fees.push(fee);
+  }
+  return { labels: labels, yields: yields, fees: fees };
+}
+function render() {
+  var data = compute();
+  document.getElementById('daysVal').textContent = document.getElementById('days').value;
+  document.getElementById('growthVal').textContent = document.getElementById('growth').value;
+  document.getElementById('shockDayVal').textContent = document.getElementById('shockDay').value;
+  var muted = '#898781';
+  var opts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: muted, maxTicksLimit: 6 }, grid: { display: false } },
+      y: { ticks: { color: muted }, grid: { color: 'rgba(137,135,129,0.15)' } }
+    }
+  };
+  if (yc) yc.destroy();
+  if (fc) fc.destroy();
+  yc = new Chart(document.getElementById('yieldChart'), {
+    type: 'line',
+    data: { labels: data.labels, datasets: [{ data: data.yields, borderColor: '#639922', borderWidth: 2, pointRadius: 0, tension: 0.3 }] },
+    options: opts
+  });
+  fc = new Chart(document.getElementById('feeChart'), {
+    type: 'line',
+    data: { labels: data.labels, datasets: [{ data: data.fees, borderColor: '#e24b4a', borderWidth: 2, pointRadius: 0, tension: 0.3 }] },
+    options: opts
+  });
+}
+['days','growth','shockDay'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', render);
+});
+render();
+</script>
+</body>
+</html>
